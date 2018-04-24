@@ -1,3 +1,9 @@
+//GTT Arduino Thermometer Demo Stage 2
+//Arduino Uno with Matrix Orbital GTT70A and DS18S20
+//Created by Divino, 24/04/2018
+//support@matrixorbital.ca
+//www.matrixorbital.ca/appnotes
+
 #include <gtt.h>
 #include <gtt_device.h>
 #include <gtt_enum.h>
