@@ -52,7 +52,7 @@ void setup() {
   resetDisplay();
   //Wait for display to reset  
   delay(3000);            
-  gtt_set_screen1_image_toggle_2_state(&gtt, 1); //If the Arduino can establish communication with the GTT, toggle the Arduino connection indicator appropriately       
+  gtt_set_screen1_image_toggle_2_state(&gtt, eButtonState::eButtonState_Down ); //If the Arduino can establish communication with the GTT, toggle the Arduino connection indicator appropriately       
   gtt25_set_button_clickhandler(&gtt, MyButtonClick); //Configure the button click handler
   setCommunicationChannel(2); //set the communication channel to i2c so button clicks can be returned to the Arduino
   tempSensorReady = 1; //Indicate that the DS18S20 is ready for communication
@@ -68,7 +68,7 @@ void loop() {
   if((millis()-tempTimer)>=800){ //800+ mS after starting the conversion, read the temp
     if(probeConnected){ //If the probe is connected    
         int16_t temp = readTempProbe(); //Read the temperature            
-        char buf[4] = {0};
+        char buf[8] = {0};
         sprintf(buf,"%d",temp); //Convert the temperature value to a string
         gtt_set_screen1_dynamic_label_2_text(&gtt, gtt_make_text_ascii(buf)); //Update the GTT label
         gtt_set_screen1_bar_graph_1_value(&gtt, temp); //Update the GTT bar graph              
@@ -84,9 +84,10 @@ void loop() {
         }        
     }   
     else { //If the probe isn't connected
-      gtt_set_screen1_image_toggle_3_state(&gtt, 0); //Set the probe indicator to "Disconnected"  
+      gtt_set_screen1_image_toggle_3_state(&gtt, eButtonState::eButtonState_Up); //Set the probe indicator to "Disconnected"  
       gtt_set_screen1_bar_graph_1_value(&gtt, 0); //Set the GTT bar graph to 0     
-      gtt_set_screen1_dynamic_label_2_text(&gtt, gtt_make_text_ascii("NA")); //Update the GTT label to "NA"          
+      char Message[] = "NA";
+      gtt_set_screen1_dynamic_label_2_text(&gtt, gtt_make_text_ascii(Message)); //Update the GTT label to "NA"          
     }
     tempSensorReady = 1; //Temperature sensor is ready for another conversion    
   }      
@@ -148,19 +149,19 @@ void MyButtonClick(gtt_device* gtt, uint16_t ObjectID, uint8_t State)
 
 void resetDisplay() {
   Serial.println("resetting display");
-  char command[] = { 254, 1 };
+  uint8_t command[] = { 254, 1 };
   i2cWrite(&gtt, command, sizeof(command));
 }
 
 void setCommunicationChannel(byte channel) {
   Serial.println("Setting Communication Channel");
-  char command[] = { 254, 5, channel };
+  uint8_t command[] = { 254, 5, channel };
   i2cWrite(&gtt, command, sizeof(command));
 }
 
 void activateBuzzer(short frequency, short duration) {
   Serial.println("Setting Communication Channel");
-  char command[] = { 254, 187, (byte)(frequency >>8), (byte)(frequency && 0xFF), (byte)(duration >>8), (byte)(duration && 0xFF)};
+  uint8_t command[] = { 254, 187, (byte)(frequency >>8), (byte)(frequency && 0xFF), (byte)(duration >>8), (byte)(duration && 0xFF)};
   i2cWrite(&gtt, command, sizeof(command));
 }
 
@@ -178,18 +179,18 @@ byte searchForTempProbe(){
   }
   if ( OneWire::crc8( addr, 7) != addr[7]) {
       Serial.print("CRC is not valid!\n");
-      gtt_set_screen1_image_toggle_3_state(&gtt, 0); //Set the probe indicator to "Disconnected"      
+      gtt_set_screen1_image_toggle_3_state(&gtt, eButtonState::eButtonState_Up); //Set the probe indicator to "Disconnected"      
       return 0;
   }
   if ( addr[0] == 0x10) {
       Serial.print("Device is a DS18S20 family device.\n");
-      gtt_set_screen1_image_toggle_3_state(&gtt, 1); //Set the probe indicator to "Connected"
+      gtt_set_screen1_image_toggle_3_state(&gtt, eButtonState::eButtonState_Down); //Set the probe indicator to "Connected"
       return 1;
   }     
   else {
       Serial.print("Device family is not recognized: 0x");
       Serial.println(addr[0],HEX);
-      gtt_set_screen1_image_toggle_3_state(&gtt, 0); //Set the probe indicator to "Disconnected"      
+      gtt_set_screen1_image_toggle_3_state(&gtt, eButtonState::eButtonState_Up); //Set the probe indicator to "Disconnected"      
       return 0;
   }
 }
@@ -201,11 +202,10 @@ void startTempConversion(){
 }
 
 uint16_t readTempProbe(){
-  byte present = 0;
   byte data[12];
   uint16_t temp;
      
-  present = ds18s20.reset();
+  ds18s20.reset();
   ds18s20.select(addr);    
   ds18s20.write(0xBE);// Read Scratchpad
   
@@ -219,7 +219,7 @@ uint16_t readTempProbe(){
   return temp;
 }     
 
-int i2cWrite(gtt_device* gtt_device, char* data, byte data_length) {//Write an array of bytes over i2c
+int i2cWrite(gtt_device* device,uint8_t *data, size_t data_length) {//Write an array of bytes over i2c
   Wire.beginTransmission(I2C_Address);  
   for (int i = 0; i < data_length; i++) {
     Wire.write(data[i]);        
@@ -228,7 +228,7 @@ int i2cWrite(gtt_device* gtt_device, char* data, byte data_length) {//Write an a
   return 0;
 }
 
-byte i2cRead(gtt_device* gtt_device) { //Wait for one byte to be read over i2c  
+int i2cRead(gtt_device* gtt_device) { //Wait for one byte to be read over i2c  
   byte data;  
   Wire.beginTransmission(I2C_Address);  
   Wire.requestFrom(I2C_Address, 1);     
@@ -241,4 +241,3 @@ byte i2cRead(gtt_device* gtt_device) { //Wait for one byte to be read over i2c
     return data;
   }
 }
-
